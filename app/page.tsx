@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card"
+import { Button } from "@/ui/button"
 
 export default function Home() {
   return (
@@ -7,7 +8,7 @@ export default function Home() {
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold">CatAssist</h1>
         <p className="mt-2 text-muted-foreground">
-          Next.js + Tailwind + shadcn/ui is now working perfectly.
+          Next.js + Tailwind + shadcn/ui + demo dashboard.
         </p>
       </header>
 
@@ -17,27 +18,15 @@ export default function Home() {
             <CardTitle>Get Started</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-3">
-            <Button>Open Dashboard</Button>
-            <Button variant="outline">Learn More</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            <Button asChild size="sm" variant="secondary">
-              <a href="https://nextjs.org/docs" target="_blank" rel="noreferrer">Next.js Docs</a>
+            <Button asChild>
+              <Link href="/login">Open Demo Login</Link>
             </Button>
-            <Button asChild size="sm" variant="secondary">
-              <a href="https://ui.shadcn.com" target="_blank" rel="noreferrer">shadcn/ui</a>
-            </Button>
-            <Button asChild size="sm" variant="secondary">
-              <a href="https://tailwindcss.com/docs" target="_blank" rel="noreferrer">Tailwind Docs</a>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
           </CardContent>
         </Card>
+        {/* keep your other card as-is */}
       </div>
     </div>
   )
