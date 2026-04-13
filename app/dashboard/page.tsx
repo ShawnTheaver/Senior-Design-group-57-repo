@@ -327,7 +327,7 @@ export default function DashboardPage() {
               <div className="h-[560px] rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-slate-900">
-                    CatAssist – AI Planner
+                    Ai Assistant
                   </h2>
 
                   <button
