@@ -1,16 +1,16 @@
-// hooks/useAuth.tsx
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 type User = {
+  id: number
   email: string
   name: string
 }
 
 type AuthCtx = {
   user: User | null
-  login: (email: string, name: string) => void
+  login: (email: string, name: string, id: number) => void
   logout: () => void
 }
 
@@ -20,22 +20,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const raw = localStorage.getItem('catassist_user')
-    if (raw) setUser(JSON.parse(raw))
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null
+    if (raw) {
+      try {
+        setUser(JSON.parse(raw))
+      } catch {}
+    }
   }, [])
 
-  function login(email: string, name: string) {
-    const u = { email, name }
-    localStorage.setItem('catassist_user', JSON.stringify(u))
-    setUser(u)
+  function login(email: string, name: string, id: number) {
+    const nextUser = { id, email, name }
+    setUser(nextUser)
+    localStorage.setItem('auth_user', JSON.stringify(nextUser))
   }
 
   function logout() {
-    localStorage.removeItem('catassist_user')
     setUser(null)
+    localStorage.removeItem('auth_user')
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
   }
 
-  return <Ctx.Provider value={{ user, login, logout }}>{children}</Ctx.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      login,
+      logout,
+    }),
+    [user]
+  )
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useAuth() {

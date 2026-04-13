@@ -1,136 +1,146 @@
-// components/Chatbot.tsx
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 
-type Msg = { role: 'user' | 'bot'; text: string }
+export type PlannerMessage = {
+  role: 'user' | 'assistant'
+  text: string
+}
 
-const START: Msg[] = [
-  { role: 'bot', text: "Hi! I'm CatAssist 😺. Ask about your curriculum, schedule, or scenario." },
-  { role: 'bot', text: "Try: 'What’s my curriculum?', 'Tell me my scenario', or 'What’s due this week?'" },
-]
+type ChatbotProps = {
+  onMessagesChange?: (messages: PlannerMessage[]) => void
+}
 
-export default function Chatbot() {
+export default function Chatbot({ onMessagesChange }: ChatbotProps) {
   const { user } = useAuth()
-  const [msgs, setMsgs] = useState<Msg[]>(START)
+
+  const [messages, setMessages] = useState<PlannerMessage[]>([
+    {
+      role: 'assistant',
+      text: "Hi! I'm CatAssist 🐱. Ask about your curriculum, schedule, or scenario.",
+    },
+  ])
+
   const [input, setInput] = useState('')
-  const boxRef = useRef<HTMLDivElement | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const suggestions = [
+    'What is my curriculum?',
+    'What classes should I take next semester?',
+    'How many credits do I need for next semester?',
+    'Which professors are available for the classes I’m taking next semester?',
+    'Where are classes located that I’m taking next semester?',
+    'Am I missing any required classes from the curriculum that I should have taken by now?',
+  ]
 
   useEffect(() => {
-    boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: 'smooth' })
-  }, [msgs])
+    onMessagesChange?.(messages)
+  }, [messages, onMessagesChange])
 
-  async function smartReply(prompt: string): Promise<string> {
-    if (!user) return 'Please sign in first.'
-    const emailQ = `email=${encodeURIComponent(user.email)}`
-    const p = prompt.toLowerCase()
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
 
-    // curriculum
-    if (/\bcurriculum|major|degree\b/.test(p)) {
-      const res = await fetch(`/data/curriculum?${emailQ}`)
-      const data = await res.json()
-      if (!data.curriculum) return 'I could not find a curriculum linked to your account.'
-      const { name, description, total_courses, courses_completed, gpa } = data.curriculum
-      const done = Number(courses_completed || 0)
-      const total = Number(total_courses || 0)
-      const pct = total ? Math.round((done / total) * 100) : 0
-      return `You're in “${name}” (${pct}% complete, GPA ${gpa ?? '—'}).\n${description}`
+  async function sendMessage(msg?: string) {
+    const text = (msg ?? input).trim()
+    if (!text) return
+
+    if (!user?.email) {
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', text: 'Please sign in to use CatAssist.' },
+      ])
+      return
     }
 
-    // scenario (fake narrative)
-    if (/\bscenario|juggling|what am i working|my focus\b/.test(p)) {
-      const res = await fetch(`/data/scenario?${emailQ}`)
-      const data = await res.json()
-      if (!data.scenario) return 'No scenario saved for you yet.'
-      const s = data.scenario
-      return `${s.headline}\n${s.narrative}`
-    }
-
-    // schedule / due this week
-    if (/\bdue|schedule|week|tomorrow|today\b/.test(p)) {
-      const res = await fetch(`/data/schedule?${emailQ}`)
-      const data = await res.json()
-      const events = (data.events || []) as { day: string; time: string; title: string }[]
-      if (events.length === 0) return 'You have no upcoming events stored.'
-      const lines = events.slice(0, 6).map(e => `${e.day} ${e.time} — ${e.title}`)
-      return `Here’s your upcoming schedule:\n` + lines.join('\n')
-    }
-
-    // fallback
-    return "I can fetch your curriculum (/data/curriculum), scenario (/data/scenario), and events (/data/schedule). Try one of those!"
-  }
-
-  async function send() {
-    if (!input.trim()) return
-    const prompt = input.trim()
-    setMsgs((m) => [...m, { role: 'user', text: prompt }])
     setInput('')
-    const reply = await smartReply(prompt)
-    setMsgs((m) => [...m, { role: 'bot', text: reply }])
+    setMessages((m) => [...m, { role: 'user', text }])
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          message: text,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Server error')
+
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', text: data.reply ?? 'No reply returned.' },
+      ])
+    } catch (e: any) {
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', text: e?.message || 'Network error.' },
+      ])
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="flex gap-4 flex-wrap">
-      <div className="flex-1 min-w-[260px] bg-slate-900/60 border border-slate-800 rounded-2xl p-3 flex flex-col">
-        <div
-          ref={boxRef}
-          className="flex-1 overflow-y-auto space-y-2 mb-3 pr-1"
-          style={{ maxHeight: 260 }}
-        >
-          {msgs.map((m, i) => (
-            <div
-              key={i}
-              className={`px-3 py-2 text-sm rounded-2xl ${
-                m.role === 'user'
-                  ? 'bg-emerald-600 text-white ml-auto max-w-[80%]'
-                  : 'bg-slate-800 text-slate-100 mr-auto max-w-[85%]'
-              }`}
-            >
-              {m.text}
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
+    <div className="flex h-full flex-col">
+      <div className="flex-1 space-y-3 overflow-y-auto pr-2">
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className={`max-w-[85%] whitespace-pre-wrap rounded-2xl p-3 text-sm ${
+              m.role === 'user'
+                ? 'ml-auto bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-900'
+            }`}
+          >
+            {m.text}
+          </div>
+        ))}
+
+        {loading && <div className="text-sm italic text-slate-400">Thinking…</div>}
+
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="mt-4 border-t border-slate-200 pt-4">
+        <div className="flex items-center gap-2">
           <input
-            className="flex-1 px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-700 text-slate-100 outline-none"
-            placeholder="Ask CatAssist anything…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Ask CatAssist anything..."
+            className="flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none"
           />
           <button
-            className="px-4 py-2 rounded-xl bg-emerald-600 text-sm font-semibold"
-            onClick={send}
+            onClick={() => sendMessage()}
+            disabled={loading}
+            className="rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
           >
             Send
           </button>
         </div>
-      </div>
 
-      <div className="w-72 space-y-3">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-3">
-          <div className="text-[10px] uppercase text-slate-500 mb-1">Suggestions</div>
-          <div className="grid gap-2">
+        <div className="mt-4 text-xs font-semibold tracking-wide text-slate-400">
+          SUGGESTIONS
+        </div>
+
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {suggestions.map((s, i) => (
             <button
-              className="text-xs px-2 py-1 rounded-full bg-slate-800 text-slate-200 text-left"
-              onClick={() => setInput("What’s my curriculum?")}
+              key={i}
+              onClick={() => sendMessage(s)}
+              disabled={loading}
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
             >
-              What’s my curriculum?
+              {s}
             </button>
-            <button
-              className="text-xs px-2 py-1 rounded-full bg-slate-800 text-slate-200 text-left"
-              onClick={() => setInput("Tell me my scenario")}
-            >
-              Tell me my scenario
-            </button>
-            <button
-              className="text-xs px-2 py-1 rounded-full bg-slate-800 text-slate-200 text-left"
-              onClick={() => setInput("What’s due this week?")}
-            >
-              What’s due this week?
-            </button>
-          </div>
+          ))}
         </div>
       </div>
     </div>

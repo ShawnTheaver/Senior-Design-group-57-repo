@@ -4,44 +4,34 @@ import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 
-const DEMO_EMAILS: Record<string, string> = {
-  alice: 'alice@example.com',
-  bob: 'bob@example.com',
-  charlie: 'charlie@example.com',
-  diana: 'diana@example.com',
-  eric: 'eric@example.com',
-  'm10000001': 'alice@example.com',
-  'm10000002': 'bob@example.com',
-  'm10000003': 'charlie@example.com',
-  'm10000004': 'diana@example.com',
-  'm10000005': 'eric@example.com',
-}
-
-function normalizeToEmail(id: string) {
-  const raw = id.trim().toLowerCase()
-  if (!raw) return ''
-  if (raw.includes('@')) return raw
-  return DEMO_EMAILS[raw] || raw // fall back to what was typed
-}
-
 export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
-  const [identifier, setIdentifier] = useState('')
+
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [err, setErr] = useState<string>('')
+  const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setErr('')
     setBusy(true)
+
     try {
-      const email = normalizeToEmail(identifier)
-      if (!email) throw new Error('Enter your email or demo username (alice/bob/charlie/diana/eric)')
-      // demo ignores password; we keep a name for greeting
-      const name = email.split('@')[0]
-      login(email, name)
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Login failed')
+      }
+
+      login(data.user.email, data.user.name, data.user.id)
       router.replace('/dashboard')
     } catch (e: any) {
       setErr(e?.message || 'Login failed')
@@ -50,48 +40,55 @@ export default function LoginPage() {
     }
   }
 
-  function quick(email: string, name: string) {
-    login(email, name)
-    router.replace('/dashboard')
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="w-full max-w-sm px-6 py-8 rounded-3xl bg-slate-900/80 border border-slate-800">
-        <h2 className="text-xl font-semibold text-slate-50 mb-6">Sign in</h2>
+    <div className="min-h-[calc(100vh-4rem)] bg-[#f8fafc]">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6">
+            <div className="text-sm font-medium text-slate-500">CatAssist</div>
+            <h1 className="mt-1 text-3xl font-semibold text-slate-900">Sign in</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Use your CatAssist email and password.
+            </p>
+          </div>
 
-        <form onSubmit={onSubmit} className="grid gap-3">
-          <input
-            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 outline-none"
-            placeholder="Email / demo username (alice, bob, …)"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-          />
-          <input
-            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 outline-none"
-            placeholder="Password (ignored in demo)"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <form onSubmit={onSubmit} className="grid gap-4">
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium text-slate-700">Email</label>
+              <input
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter email"
+                autoComplete="email"
+                required
+              />
+            </div>
 
-          {err && <div className="text-[13px] text-rose-400">{err}</div>}
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium text-slate-700">Password</label>
+              <input
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                autoComplete="current-password"
+                required
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="mt-1 px-3 py-2 rounded-xl bg-emerald-500 text-slate-900 text-sm font-semibold disabled:opacity-60"
-          >
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+            {err ? <div className="text-sm text-red-500">{err}</div> : null}
 
-        <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-          <button className="px-3 py-2 rounded-xl bg-slate-800" onClick={() => quick('alice@example.com', 'Alice (BSIT)')}>Alice (BSIT)</button>
-          <button className="px-3 py-2 rounded-xl bg-slate-800" onClick={() => quick('bob@example.com', 'Bob (Cybersecurity)')}>Bob (Cybersecurity)</button>
-          <button className="px-3 py-2 rounded-xl bg-slate-800" onClick={() => quick('charlie@example.com', 'Charlie (Accounting)')}>Charlie (Accounting)</button>
-          <button className="px-3 py-2 rounded-xl bg-slate-800" onClick={() => quick('diana@example.com', 'Diana (Finance)')}>Diana (Finance)</button>
-          <button className="px-3 py-2 rounded-xl bg-slate-800 col-span-2" onClick={() => quick('eric@example.com', 'Eric (ME)')}>Eric (ME)</button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="mt-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            >
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
         </div>
       </div>
     </div>

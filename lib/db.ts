@@ -1,13 +1,17 @@
 // lib/db.ts
-import { Pool } from 'pg'
+import { Pool } from "pg"
 
-const url = process.env.DATABASE_URL
-if (!url) {
-  throw new Error('❌ Missing DATABASE_URL in .env')
+const globalForPg = global as unknown as {
+  pool: Pool | undefined
 }
 
-// Works for Neon and local Postgres
-export const pool = new Pool({
-  connectionString: url,
-  ssl: { rejectUnauthorized: false },
-})
+export const pool =
+  globalForPg.pool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  })
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPg.pool = pool
+}
